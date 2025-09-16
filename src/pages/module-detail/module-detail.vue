@@ -130,6 +130,7 @@ const showLoginDialog = ref(false)
 const loading = ref(true)
 const pagination = ref({ page: 1, limit: 20 })
 
+// TODO: 不应该混用indexNeedRefresh, 后面使用事件总线替换
 useDidShow(() => {
   if (config.indexNeedRefresh) {
     forumInfoRefresh.value++

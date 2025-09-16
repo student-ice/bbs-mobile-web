@@ -1,11 +1,11 @@
 <template>
-  <nut-config-provider :theme='config.theme'>
+  <nut-config-provider :theme='theme'>
     <NavComponent show-search></NavComponent>
     <view class="index-page">
       <!-- 轮播图 -->
-      <view class="carousel" v-if="!config.carouselState.isLoading">
+      <view class="carousel" v-if="!carouselState.isLoading">
         <nut-swiper :init-page="0" :pagination-visible="true" pagination-color="#426543" auto-play="3000">
-          <nut-swiper-item v-for="item in config.carouselState.state?.cards" @click="goLike(item.link)">
+          <nut-swiper-item v-for="item in carouselState.state?.cards" @click="goLike(item.link)">
             <img :src="apiServer + item.img.url" :alt="item.title" />
           </nut-swiper-item>
         </nut-swiper>
@@ -73,120 +73,48 @@
 </template>
 
 <script lang="ts" setup>
-
 import TopIcon from '@/assets/top.svg'
-
-import { computedAsync } from "@vueuse/core";
-import { apiServer, IndexThread, ThreadIndexResponse } from '@/api'
-import Taro, { useLoad, useShareTimeline, usePullDownRefresh, useTabItemTap, useDidShow } from '@tarojs/taro'
+import { apiServer } from '@/api'
+import Taro, { usePullDownRefresh, useTabItemTap, useDidShow } from '@tarojs/taro'
 import { Comment, Eye } from "@nutui/icons-vue-taro";
-import { useAccountStore, useConfigStore, useSubscriptionStore } from '@/stores'
-import { watch, ref } from 'vue';
+import { useConfigStore } from '@/stores'
 import NavComponent from "@/widgets/navigation.vue";
-import { setMessageCount } from '@/utils/message';
+import { toRefs } from 'vue';
 
-const config = useConfigStore()
-const account = useAccountStore()
-const subscribe = useSubscriptionStore()
-// 加载帖子数据
-const isLoading = ref(true)
-const pagination = ref({ page: 1, limit: 20 })
-const threadIndexRefresh = ref(0)
-const threadIndexResponse = ref<ThreadIndexResponse>({ ThreadIndex: [], total_count: 0 })
-computedAsync(async () => {
-  threadIndexRefresh.value
-  const resp = await IndexThread({ page: pagination.value.page, pageSize: pagination.value.limit });
-  threadIndexResponse.value = resp.data || [];
-  Taro.stopPullDownRefresh()
-}, undefined, { evaluating: isLoading })
-// 加载消息数量
-useDidShow(async () => {
-  if (config.indexNeedRefresh) {
-    threadIndexRefresh.value++
-    config.indexNeedRefresh = false
-  }
+import { 
+  useThreadList, 
+  useTabDoubleClick, 
+  useNavigation, 
+  usePageSetup 
+} from '@/use';
 
-  subscribe.getSeverSubscribe()
-})
+const cs = useConfigStore();
+const { theme, carouselState } = toRefs(cs);
 
-useLoad(async () => {
-  setMessageCount()
-  // 前端强制退出登录一次
-  const isForceLogout = Taro.getStorageSync('forceLogoutFlag')
-  if (isForceLogout !== false) {
-    await account.logout()
-    Taro.setStorageSync('forceLogoutFlag', false)
-    return
-  }
-})
+const { isLoading, pagination, threadIndexResponse, refreshThreadList } = useThreadList();
+const { handleTabClick } = useTabDoubleClick(
+  undefined,
+  () => refreshThreadList(true) // 双击时刷新并重置页码
+);
+const { goThread, goLike, setupShare } = useNavigation();
+const { setupPage } = usePageSetup({
+  checkForceLogout: true,
+  getServerSubscribe: true
+});
+
+// 设置页面
+setupPage();
+setupShare();
 
 // 首页下拉刷新
-usePullDownRefresh(async () => {
-  threadIndexRefresh.value++
-})
-// 翻页后跳转到顶部
-watch(isLoading, () => {
-  Taro.pageScrollTo({
-    scrollTop: 0,
-    duration: 300
-  })
-})
-// 双击tab刷新
-const tabClick = ref(false)
-let lastClickTime = 0
+usePullDownRefresh(() => {
+  refreshThreadList();
+});
 
-// 点击首页 tab 的处理函数
+// 监听 Tab 点击
 useTabItemTap(() => {
-  const currentTime = Date.now()
-
-  // 判断是否为双击（两次点击间隔小于 200ms）
-  if (currentTime - lastClickTime < 200) {
-    // 双击逻辑
-    pagination.value.page = 1 // 重置页码为 1
-    // 强制刷新帖子列表
-    threadIndexRefresh.value++
-    tabClick.value = false // 重置标记
-    lastClickTime = 0 // 重置上一次点击时间
-    return // 双击逻辑执行后直接返回
-  }
-
-  // 单击逻辑
-  tabClick.value = true
-  lastClickTime = currentTime // 更新上一次点击时间
-
-  setTimeout(() => {
-    if (tabClick.value) {
-      // 200ms 内没有第二次点击，当作单击
-      tabClick.value = false
-    }
-  }, 200)
-
-})
-// 跳转到帖子详情
-const goThread = (item: ThreadIndexResponse["ThreadIndex"][0]) => {
-  // 预览数量增加
-  item.views_cnt++
-  Taro.navigateTo({
-    url: `/pages/thread/thread?id=${item.id}`,
-  })
-}
-// 跳转到链接
-const goLike = (page: string) => {
-  // 小程序无法跳转到网页
-  if (page.startsWith("https://")) {
-    return
-  }
-  Taro.navigateTo({
-    url: page,
-  })
-}
-// 设置分享内容
-useShareTimeline(() => {
-  return {
-    title: "论坛首页-深度科技",
-    imageUrl: config.weixinShare.state?.default_img
-  }
-})
+  handleTabClick();
+});
 </script>
 
 <style lang="scss">

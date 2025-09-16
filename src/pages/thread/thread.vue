@@ -267,6 +267,7 @@ import Tags from '@/widgets/tags.vue';
 import ThreadOp from "./thread-op.vue"
 import PostOp from "./post-op.vue"
 import NavH5 from "@/widgets/navigation-h5.vue";
+import { notifyThreadListRefresh } from "@/utils/threadHelper";
 
 if (process.env.TARO_ENV === 'h5') {
     // 加载vditor样式
@@ -360,7 +361,7 @@ useUnload(() => {
     if (Number(instance.router.params['posting'] || 0)) {
         // 携带这个参数说明是从发帖页面跳转过来
         // 返回时需要多返回一步
-        config.indexNeedRefresh = true
+        notifyThreadListRefresh();
         Taro.navigateBack()
     }
 })

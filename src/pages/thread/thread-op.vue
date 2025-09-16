@@ -178,6 +178,7 @@ import {
 } from '@/api';
 import Taro from "@tarojs/taro";
 import { computedAsync } from "@vueuse/core";
+import { notifyThreadListRefresh } from "@/utils/threadHelper";
 
 const threadInfo = defineModel<ThreadInfoData>("threadInfo", { required: true })
 const threadResolved = defineModel<boolean>("threadResolved", { required: true })
@@ -241,7 +242,7 @@ const deleteThread = async () => {
   const { data } = await DeleteThread(threadInfo.value.id)
   if (!data.code) {
     prompt.showToast("success", "删除成功")
-    config.indexNeedRefresh = true
+    notifyThreadListRefresh();
     Taro.navigateBack()
   }
 }
@@ -368,7 +369,7 @@ const moderatorDelDialogClosed = async (action: string) => {
       })
       if (!data.code) {
         prompt.showToast("success", "删除成功")
-        config.indexNeedRefresh = true
+        notifyThreadListRefresh();
         Taro.navigateBack()
       }
       return true
